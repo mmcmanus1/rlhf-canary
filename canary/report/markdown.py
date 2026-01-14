@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from canary.collect.metrics import CanaryMetrics
-from canary.compare.heuristics import HeuristicAnalysis, analyze_regression, format_suspects_markdown
+from canary.compare.heuristics import (
+    analyze_regression,
+    format_suspects_markdown,
+)
 from canary.compare.stats import CheckStatus, ComparisonReport
 
 

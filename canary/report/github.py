@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import subprocess
-from typing import Any
 
 from canary.collect.metrics import CanaryMetrics
 from canary.compare.stats import ComparisonReport
@@ -61,7 +60,7 @@ def post_github_comment(
 
     # Post comment using gh CLI
     try:
-        result = subprocess.run(
+        subprocess.run(
             [
                 "gh",
                 "pr",
@@ -117,7 +116,7 @@ def update_pr_status(
     description = generate_short_summary(report)[:140]  # GitHub limit
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             [
                 "gh",
                 "api",

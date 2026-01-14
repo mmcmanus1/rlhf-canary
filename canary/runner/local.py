@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,7 +14,7 @@ from canary.collect.metrics import (
     PerformanceMetrics,
     RunConfig,
 )
-from canary.runner.base import BaseRunner, CanaryConfig, RunResult
+from canary.runner.base import BaseRunner, RunResult
 
 logger = logging.getLogger(__name__)
 
