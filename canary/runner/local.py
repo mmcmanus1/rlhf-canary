@@ -157,6 +157,8 @@ class LocalRunner(BaseRunner):
             )
 
         # Training arguments (DPOConfig extends TrainingArguments with DPO-specific params)
+        # NOTE: Disable mixed precision (bf16/fp16) to avoid TRL 0.26 dtype bug where
+        # input_ids get cast to float during concatenated_forward
         training_args = DPOConfig(
             output_dir=str(output_dir / "checkpoints"),
             per_device_train_batch_size=self.config.batch_size,
@@ -165,8 +167,8 @@ class LocalRunner(BaseRunner):
             max_steps=self.config.max_steps,
             logging_steps=10,
             save_strategy="no",  # Don't save checkpoints in canary
-            bf16=use_bf16,
-            fp16=not use_bf16 and torch.cuda.is_available(),
+            bf16=False,  # Disabled due to TRL 0.26 dtype bug
+            fp16=False,  # Disabled due to TRL 0.26 dtype bug
             report_to=[],
             seed=self.config.seed,
             learning_rate=self.config.learning_rate,
