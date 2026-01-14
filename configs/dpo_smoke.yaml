@@ -1,0 +1,41 @@
+# DPO Smoke Test Configuration
+# Quick canary run for PR gating (~5-10 min)
+
+name: dpo_smoke
+description: DPO smoke test - quick validation for PR gating
+
+# Model configuration
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Training configuration
+training_type: dpo
+max_steps: 100
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+max_length: 256
+warmup_steps: 10
+
+# DPO-specific
+beta: 0.1
+max_prompt_length: 64
+
+# Dataset configuration
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 512
+seed: 42
+
+# Output configuration
+output_dir: ./canary_output
+
+# Metrics configuration
+metrics_warmup_steps: 10
+
+# Profiler (disabled for smoke)
+profiler:
+  enabled: false
