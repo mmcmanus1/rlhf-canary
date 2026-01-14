@@ -1,0 +1,55 @@
+# DPO Nightly Soak Test Configuration
+# Extended run for thorough regression detection (~1-2 hours)
+
+name: dpo_nightly
+description: DPO nightly soak test - comprehensive performance and stability analysis
+
+# Model configuration
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Training configuration
+training_type: dpo
+max_steps: 2000
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+max_length: 256
+warmup_steps: 50
+
+# DPO-specific
+beta: 0.1
+max_prompt_length: 64
+
+# Dataset configuration
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 8192
+seed: 42
+
+# Output configuration
+output_dir: ./canary_output
+
+# Metrics configuration
+metrics_warmup_steps: 50
+
+# Profiler (enabled with extended sampling for nightly)
+profiler:
+  enabled: true
+  start_step: 500
+  num_steps: 100
+  output_dir: ./profiler_traces
+  record_shapes: true
+  profile_memory: true
+  with_stack: true
+
+# Threshold overrides (stricter for nightly)
+thresholds:
+  base_tier: nightly
+  max_step_time_increase_pct: 5.0
+  max_tps_drop_pct: 3.0
+  max_mem_increase_mb: 200.0
+  min_step_count: 100
