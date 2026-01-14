@@ -14,6 +14,7 @@ from canary.collect.metrics import (
     PerformanceMetrics,
     RunConfig,
 )
+from canary.collect.profiler import ProfilerTrainerCallback
 from canary.runner.base import BaseRunner, RunResult
 
 logger = logging.getLogger(__name__)
@@ -180,8 +181,19 @@ class LocalRunner(BaseRunner):
             precompute_ref_log_probs=False,  # Explicitly disable to avoid dtype issues
         )
 
-        # Create callback
+        # Create callbacks
         canary_callback = CanaryCallback(warmup_steps=self.config.metrics_warmup_steps)
+        callbacks = [canary_callback]
+
+        # Add profiler callback if enabled
+        profiler_callback = None
+        if self.config.profiler.enabled:
+            profiler_callback = ProfilerTrainerCallback(self.config.profiler, run_id)
+            callbacks.append(profiler_callback)
+            logger.info(
+                f"Profiler enabled: will capture steps {self.config.profiler.start_step} "
+                f"to {self.config.profiler.start_step + self.config.profiler.num_steps}"
+            )
 
         logger.info("Starting DPO training...")
 
@@ -189,14 +201,21 @@ class LocalRunner(BaseRunner):
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
 
+        # Note: DPOTrainer creates a reference model internally, which roughly
+        # doubles memory usage. This is expected behavior for DPO training.
+        logger.info(
+            "DPO training will create a reference model copy. "
+            "Expect ~2x memory usage compared to SFT."
+        )
+
         trainer = DPOTrainer(
             model=model,
             ref_model=None,  # DPOTrainer creates ref model internally
             args=training_args,
             train_dataset=dataset,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,  # renamed from tokenizer in TRL 0.26+
             peft_config=peft_config,
-            callbacks=[canary_callback],
+            callbacks=callbacks,
         )
 
         trainer.train()
@@ -211,6 +230,13 @@ class LocalRunner(BaseRunner):
             self.config.max_length,
             is_dpo=True,
         )
+
+        # Get profiler summary if profiling was enabled
+        profiler_summary = None
+        if profiler_callback is not None:
+            profiler_summary = profiler_callback.get_summary()
+            if profiler_summary:
+                profiler_summary = profiler_summary.model_dump()
 
         return CanaryMetrics(
             run_id=run_id,
@@ -233,8 +259,11 @@ class LocalRunner(BaseRunner):
                 step_time=step_stats,
                 approx_tokens_per_sec=tokens_per_sec,
                 max_mem_mb=canary_callback.max_mem_mb,
+                gpu_utilization_avg=canary_callback.get_gpu_utilization_avg(),
+                dataloader_wait_pct=canary_callback.get_dataloader_wait_pct(),
             ),
             stability=stability,
+            profiler=profiler_summary,
             status="completed",
         )
 
@@ -248,7 +277,7 @@ class LocalRunner(BaseRunner):
             AutoTokenizer,
             TrainingArguments,
         )
-        from trl import SFTTrainer
+        from trl import SFTConfig, SFTTrainer
 
         logger.info("Loading tokenizer...")
         tokenizer = AutoTokenizer.from_pretrained(
@@ -312,13 +341,14 @@ class LocalRunner(BaseRunner):
                 task_type="CAUSAL_LM",
             )
 
-        # Training arguments
-        training_args = TrainingArguments(
+        # Training arguments (use SFTConfig for TRL 0.26+ compatibility)
+        training_args = SFTConfig(
             output_dir=str(output_dir / "checkpoints"),
             per_device_train_batch_size=self.config.batch_size,
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             num_train_epochs=1,
             max_steps=self.config.max_steps,
+            max_length=self.config.max_length,  # moved from SFTTrainer param in TRL 0.26+
             logging_steps=10,
             save_strategy="no",  # Don't save checkpoints in canary
             bf16=use_bf16,
@@ -329,8 +359,19 @@ class LocalRunner(BaseRunner):
             warmup_steps=self.config.warmup_steps,
         )
 
-        # Create callback
+        # Create callbacks
         canary_callback = CanaryCallback(warmup_steps=self.config.metrics_warmup_steps)
+        callbacks = [canary_callback]
+
+        # Add profiler callback if enabled
+        profiler_callback = None
+        if self.config.profiler.enabled:
+            profiler_callback = ProfilerTrainerCallback(self.config.profiler, run_id)
+            callbacks.append(profiler_callback)
+            logger.info(
+                f"Profiler enabled: will capture steps {self.config.profiler.start_step} "
+                f"to {self.config.profiler.start_step + self.config.profiler.num_steps}"
+            )
 
         logger.info("Starting SFT training...")
 
@@ -341,10 +382,9 @@ class LocalRunner(BaseRunner):
             model=model,
             args=training_args,
             train_dataset=dataset,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,  # renamed from tokenizer in TRL 0.26+
             peft_config=peft_config,
-            max_seq_length=self.config.max_length,
-            callbacks=[canary_callback],
+            callbacks=callbacks,
         )
 
         trainer.train()
@@ -359,6 +399,13 @@ class LocalRunner(BaseRunner):
             self.config.max_length,
             is_dpo=False,
         )
+
+        # Get profiler summary if profiling was enabled
+        profiler_summary = None
+        if profiler_callback is not None:
+            profiler_summary = profiler_callback.get_summary()
+            if profiler_summary:
+                profiler_summary = profiler_summary.model_dump()
 
         return CanaryMetrics(
             run_id=run_id,
@@ -381,7 +428,10 @@ class LocalRunner(BaseRunner):
                 step_time=step_stats,
                 approx_tokens_per_sec=tokens_per_sec,
                 max_mem_mb=canary_callback.max_mem_mb,
+                gpu_utilization_avg=canary_callback.get_gpu_utilization_avg(),
+                dataloader_wait_pct=canary_callback.get_dataloader_wait_pct(),
             ),
             stability=stability,
+            profiler=profiler_summary,
             status="completed",
         )

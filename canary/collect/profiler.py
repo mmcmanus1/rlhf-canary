@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any, Generator
 
 from pydantic import BaseModel
+from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
+
+logger = logging.getLogger(__name__)
 
 
 class ProfilerConfig(BaseModel):
@@ -227,3 +231,87 @@ class ProfilerCallback:
 
         except Exception:
             return ProfilerSummary()
+
+
+class ProfilerTrainerCallback(TrainerCallback):
+    """TrainerCallback that manages profiler lifecycle during training.
+
+    This integrates the ProfilerCallback with HuggingFace's Trainer,
+    automatically starting/stopping profiling at the configured steps.
+    """
+
+    def __init__(self, config: ProfilerConfig, run_id: str):
+        """Initialize the profiler trainer callback.
+
+        Args:
+            config: Profiler configuration.
+            run_id: Run identifier for trace naming.
+        """
+        self.config = config
+        self.run_id = run_id
+        self._profiler_callback = ProfilerCallback(config, run_id)
+        self._profiling_started = False
+        self._profiling_stopped = False
+        self._current_step = 0
+        self.summary: ProfilerSummary | None = None
+
+    def on_step_begin(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs: Any,
+    ) -> None:
+        """Check if we should start profiling on this step."""
+        self._current_step = state.global_step
+
+        # Start profiling when we reach the start step
+        if (
+            self.config.enabled
+            and not self._profiling_started
+            and not self._profiling_stopped
+            and state.global_step >= self.config.start_step
+        ):
+            logger.info(
+                f"Starting profiler at step {state.global_step} "
+                f"(will profile {self.config.num_steps} steps)"
+            )
+            self._profiler_callback.start_profiling()
+            self._profiling_started = True
+
+    def on_step_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs: Any,
+    ) -> None:
+        """Step the profiler and check if we should stop."""
+        if self._profiling_started and not self._profiling_stopped:
+            self._profiler_callback.step()
+
+            # Stop profiling when we've captured enough steps
+            end_step = self.config.start_step + self.config.num_steps
+            if state.global_step >= end_step:
+                logger.info(f"Stopping profiler at step {state.global_step}")
+                self.summary = self._profiler_callback.stop_profiling()
+                self._profiling_stopped = True
+                if self.summary.trace_path:
+                    logger.info(f"Profiler trace saved to: {self.summary.trace_path}")
+
+    def on_train_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs: Any,
+    ) -> None:
+        """Ensure profiler is stopped on training end."""
+        if self._profiling_started and not self._profiling_stopped:
+            logger.info("Stopping profiler at training end")
+            self.summary = self._profiler_callback.stop_profiling()
+            self._profiling_stopped = True
+
+    def get_summary(self) -> ProfilerSummary | None:
+        """Get the profiler summary if profiling was performed."""
+        return self.summary

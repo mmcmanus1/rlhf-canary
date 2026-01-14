@@ -47,6 +47,9 @@ dev = [
 quantization = [
     "bitsandbytes>=0.41.0",
 ]
+monitoring = [
+    "pynvml>=11.0.0",  # For GPU utilization monitoring
+]
 
 [project.scripts]
 canary = "canary.cli:main"
