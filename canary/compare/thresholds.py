@@ -65,3 +65,80 @@ def get_thresholds(tier: str = "default") -> Thresholds:
         "nightly": NIGHTLY_THRESHOLDS,
     }
     return thresholds_map.get(tier, DEFAULT_THRESHOLDS)
+
+
+def load_thresholds_from_yaml(path: str) -> Thresholds:
+    """Load thresholds from a YAML file.
+
+    The YAML file can optionally specify a `base_tier` to start from,
+    then override specific values.
+
+    Example YAML:
+        base_tier: smoke
+        max_step_time_increase_pct: 20.0
+        max_mem_increase_mb: 750.0
+
+    Args:
+        path: Path to threshold YAML file.
+
+    Returns:
+        Thresholds with values from file merged with base tier defaults.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+    """
+    import yaml
+    from pathlib import Path
+
+    file_path = Path(path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Threshold file not found: {path}")
+
+    with open(file_path) as f:
+        data = yaml.safe_load(f) or {}
+
+    # Get base tier if specified
+    base_tier = data.pop("base_tier", "default")
+    base = get_thresholds(base_tier)
+
+    # Merge with overrides
+    merged = base.model_dump()
+    merged.update(data)
+
+    return Thresholds(**merged)
+
+
+def load_thresholds_from_config(config_dict: dict) -> Thresholds | None:
+    """Extract threshold overrides from a canary config dict.
+
+    Looks for a 'thresholds' key in the config.
+
+    Example config with thresholds:
+        name: dpo_smoke
+        model_name: pythia-70m
+        thresholds:
+          base_tier: smoke
+          max_step_time_increase_pct: 20.0
+
+    Args:
+        config_dict: Config dictionary (from YAML load).
+
+    Returns:
+        Thresholds if overrides found, None otherwise.
+    """
+    thresholds_data = config_dict.get("thresholds")
+    if not thresholds_data:
+        return None
+
+    # Make a copy to avoid modifying the original
+    data = dict(thresholds_data)
+
+    # Get base tier if specified
+    base_tier = data.pop("base_tier", "default")
+    base = get_thresholds(base_tier)
+
+    # Merge with overrides
+    merged = base.model_dump()
+    merged.update(data)
+
+    return Thresholds(**merged)

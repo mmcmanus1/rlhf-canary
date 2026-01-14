@@ -322,6 +322,204 @@ def _analyze_loss_divergence(
     return suspects
 
 
+def _analyze_grad_norm_patterns(
+    current: CanaryMetrics,
+    baseline: CanaryMetrics,
+) -> list[Suspect]:
+    """Analyze gradient norm patterns for instability indicators.
+
+    Uses the collected grad_norm_values to detect:
+    - Gradient explosion (increasing trend)
+    - High variance (unstable training)
+    """
+    import statistics
+
+    suspects = []
+    grad_norms = current.stability.grad_norm_values
+
+    if len(grad_norms) < 10:
+        return suspects
+
+    # Check for gradient explosion (increasing trend)
+    third = len(grad_norms) // 3
+    if third > 0:
+        early_norms = grad_norms[:third]
+        late_norms = grad_norms[-third:]
+
+        if early_norms and late_norms:
+            early_mean = statistics.mean(early_norms)
+            late_mean = statistics.mean(late_norms)
+
+            if early_mean > 0 and late_mean > early_mean * 2:
+                increase_pct = (late_mean - early_mean) / early_mean * 100
+                suspects.append(
+                    Suspect(
+                        category=RegressionCategory.UNKNOWN,
+                        confidence=0.85,
+                        description="Gradient explosion detected",
+                        evidence=[
+                            f"Early gradient norm avg: {early_mean:.4f}",
+                            f"Late gradient norm avg: {late_mean:.4f}",
+                            f"Increase: {increase_pct:.1f}%",
+                        ],
+                        suggested_actions=[
+                            "Reduce learning rate",
+                            "Increase gradient clipping threshold",
+                            "Check for data anomalies in later batches",
+                            "Review optimizer settings",
+                        ],
+                    )
+                )
+
+    # Check for gradient variance (unstable training)
+    if len(grad_norms) > 20:
+        mean = statistics.mean(grad_norms)
+        if mean > 0:
+            variance = statistics.variance(grad_norms)
+            cv = (variance**0.5) / mean  # Coefficient of variation
+
+            if cv > 0.5:  # High variance relative to mean
+                suspects.append(
+                    Suspect(
+                        category=RegressionCategory.UNKNOWN,
+                        confidence=0.6,
+                        description="Unstable gradient norms",
+                        evidence=[
+                            f"Gradient norm coefficient of variation: {cv:.2f}",
+                            "High variance suggests training instability",
+                        ],
+                        suggested_actions=[
+                            "Consider gradient accumulation",
+                            "Check batch size and learning rate",
+                            "Review data shuffling and augmentation",
+                        ],
+                    )
+                )
+
+    return suspects
+
+
+def _analyze_gpu_utilization(
+    current: CanaryMetrics,
+    baseline: CanaryMetrics,
+) -> list[Suspect]:
+    """Analyze GPU utilization for bottleneck detection.
+
+    Low GPU utilization suggests CPU-side bottlenecks.
+    A significant drop from baseline indicates a new bottleneck.
+    """
+    suspects = []
+
+    current_gpu = current.perf.gpu_utilization_avg
+    baseline_gpu = baseline.perf.gpu_utilization_avg
+
+    if current_gpu is None:
+        return suspects
+
+    # Low GPU utilization suggests CPU bottleneck
+    if current_gpu < 50:
+        evidence = [f"Current GPU utilization: {current_gpu:.1f}%"]
+        if baseline_gpu is not None:
+            evidence.append(f"Baseline GPU utilization: {baseline_gpu:.1f}%")
+
+        suspects.append(
+            Suspect(
+                category=RegressionCategory.DATALOADER,
+                confidence=0.8,
+                description="Low GPU utilization indicates CPU bottleneck",
+                evidence=evidence,
+                suggested_actions=[
+                    "Increase dataloader num_workers",
+                    "Enable pin_memory in DataLoader",
+                    "Check for CPU-bound preprocessing",
+                    "Consider prefetching data",
+                ],
+            )
+        )
+
+    # GPU utilization drop from baseline
+    if baseline_gpu is not None and baseline_gpu > 0 and current_gpu < baseline_gpu * 0.8:
+        drop_pct = (baseline_gpu - current_gpu) / baseline_gpu * 100
+        suspects.append(
+            Suspect(
+                category=RegressionCategory.DATALOADER,
+                confidence=0.7,
+                description="GPU utilization dropped significantly",
+                evidence=[
+                    f"Baseline GPU utilization: {baseline_gpu:.1f}%",
+                    f"Current GPU utilization: {current_gpu:.1f}%",
+                    f"Drop: {drop_pct:.1f}%",
+                ],
+                suggested_actions=[
+                    "Profile dataloader wait time",
+                    "Check for I/O changes",
+                    "Review CPU load during training",
+                ],
+            )
+        )
+
+    return suspects
+
+
+def _analyze_dataloader_wait(
+    current: CanaryMetrics,
+    baseline: CanaryMetrics,
+) -> list[Suspect]:
+    """Analyze dataloader wait time percentage.
+
+    High dataloader wait percentage is a clear signal of data loading bottleneck.
+    """
+    suspects = []
+
+    current_wait = current.perf.dataloader_wait_pct
+    baseline_wait = baseline.perf.dataloader_wait_pct
+
+    if current_wait is None:
+        return suspects
+
+    # High dataloader wait time (>20% of step time)
+    if current_wait > 20:
+        suspects.append(
+            Suspect(
+                category=RegressionCategory.DATALOADER,
+                confidence=0.9,
+                description="Significant time spent waiting for data",
+                evidence=[
+                    f"Dataloader wait time: {current_wait:.1f}% of step time",
+                ],
+                suggested_actions=[
+                    "Increase num_workers in DataLoader",
+                    "Enable persistent_workers=True",
+                    "Use pin_memory=True",
+                    "Consider pre-caching dataset",
+                ],
+            )
+        )
+
+    # Wait time increased significantly from baseline
+    if baseline_wait is not None and baseline_wait > 0 and current_wait > baseline_wait * 1.5:
+        increase_pct = (current_wait - baseline_wait) / baseline_wait * 100
+        suspects.append(
+            Suspect(
+                category=RegressionCategory.DATALOADER,
+                confidence=0.75,
+                description="Dataloader wait time increased",
+                evidence=[
+                    f"Baseline wait: {baseline_wait:.1f}%",
+                    f"Current wait: {current_wait:.1f}%",
+                    f"Increase: {increase_pct:.1f}%",
+                ],
+                suggested_actions=[
+                    "Check for changes in data preprocessing",
+                    "Review dataset loading code",
+                    "Profile CPU utilization",
+                ],
+            )
+        )
+
+    return suspects
+
+
 def _analyze_patterns(
     report: ComparisonReport,
     current: CanaryMetrics,
@@ -371,6 +569,15 @@ def _analyze_patterns(
                     ],
                 )
             )
+
+    # Analyze gradient norm patterns
+    suspects.extend(_analyze_grad_norm_patterns(current, baseline))
+
+    # Analyze GPU utilization
+    suspects.extend(_analyze_gpu_utilization(current, baseline))
+
+    # Analyze dataloader wait time
+    suspects.extend(_analyze_dataloader_wait(current, baseline))
 
     return suspects
 

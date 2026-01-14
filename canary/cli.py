@@ -91,7 +91,13 @@ def run(ctx: click.Context, config_path: str, output_dir: str | None) -> None:
     "--threshold-tier",
     type=click.Choice(["default", "smoke", "perf", "nightly"]),
     default="default",
-    help="Threshold tier to use",
+    help="Threshold tier to use (ignored if --threshold-file provided)",
+)
+@click.option(
+    "--threshold-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to custom threshold YAML file (overrides --threshold-tier)",
 )
 @click.option(
     "-o",
@@ -107,6 +113,7 @@ def compare(
     current_path: str,
     baseline_path: str,
     threshold_tier: str,
+    threshold_file: str | None,
     output: str | None,
     json_output: bool,
 ) -> None:
@@ -116,7 +123,7 @@ def compare(
     BASELINE_PATH: Path to baseline metrics.json
     """
     from canary.compare.stats import compare_to_baseline, load_metrics
-    from canary.compare.thresholds import get_thresholds
+    from canary.compare.thresholds import get_thresholds, load_thresholds_from_yaml
     from canary.report.markdown import generate_markdown_report
 
     click.echo(f"Loading current metrics: {current_path}")
@@ -125,8 +132,13 @@ def compare(
     click.echo(f"Loading baseline metrics: {baseline_path}")
     baseline = load_metrics(baseline_path)
 
-    click.echo(f"Using threshold tier: {threshold_tier}")
-    thresholds = get_thresholds(threshold_tier)
+    # Load thresholds from file or use tier
+    if threshold_file:
+        click.echo(f"Loading custom thresholds from: {threshold_file}")
+        thresholds = load_thresholds_from_yaml(threshold_file)
+    else:
+        click.echo(f"Using threshold tier: {threshold_tier}")
+        thresholds = get_thresholds(threshold_tier)
 
     report = compare_to_baseline(current, baseline, thresholds)
 
@@ -228,6 +240,110 @@ def env(ctx: click.Context) -> None:
     click.echo(f"  Transformers: {fingerprint.transformers_version}")
     click.echo(f"  TRL: {fingerprint.trl_version}")
     click.echo(f"  Fingerprint hash: {fingerprint.fingerprint_hash}")
+
+
+@main.command("gh-report")
+@click.argument("current_path", type=click.Path(exists=True))
+@click.argument("baseline_path", type=click.Path(exists=True))
+@click.option(
+    "--threshold-tier",
+    type=click.Choice(["default", "smoke", "perf", "nightly"]),
+    default="default",
+    help="Threshold tier to use (ignored if --threshold-file provided)",
+)
+@click.option(
+    "--threshold-file",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to custom threshold YAML file (overrides --threshold-tier)",
+)
+@click.option("--post-comment/--no-comment", default=True, help="Post PR comment")
+@click.option("--update-status/--no-status", default=True, help="Update commit status")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    default=None,
+    help="Output path for comparison report",
+)
+@click.pass_context
+def gh_report(
+    ctx: click.Context,
+    current_path: str,
+    baseline_path: str,
+    threshold_tier: str,
+    threshold_file: str | None,
+    post_comment: bool,
+    update_status: bool,
+    output: str | None,
+) -> None:
+    """Post comparison results to GitHub PR.
+
+    Runs comparison and posts results as PR comment and commit status.
+
+    CURRENT_PATH: Path to current run metrics.json
+    BASELINE_PATH: Path to baseline metrics.json
+    """
+    from canary.compare.stats import compare_to_baseline, load_metrics
+    from canary.compare.thresholds import get_thresholds, load_thresholds_from_yaml
+    from canary.report.github import (
+        post_github_comment,
+        update_pr_status,
+        write_github_summary,
+    )
+    from canary.report.markdown import generate_markdown_report
+
+    click.echo(f"Loading current metrics: {current_path}")
+    current = load_metrics(current_path)
+
+    click.echo(f"Loading baseline metrics: {baseline_path}")
+    baseline = load_metrics(baseline_path)
+
+    # Load thresholds from file or use tier
+    if threshold_file:
+        click.echo(f"Loading custom thresholds from: {threshold_file}")
+        thresholds = load_thresholds_from_yaml(threshold_file)
+    else:
+        click.echo(f"Using threshold tier: {threshold_tier}")
+        thresholds = get_thresholds(threshold_tier)
+
+    report = compare_to_baseline(current, baseline, thresholds)
+
+    # Generate markdown report
+    markdown = generate_markdown_report(report, current, baseline)
+
+    # Save report if output path provided
+    if output:
+        Path(output).write_text(markdown)
+        click.echo(f"Report saved to: {output}")
+
+    # Write to GitHub job summary
+    write_github_summary(markdown)
+
+    # Post PR comment
+    if post_comment:
+        click.echo("Posting PR comment...")
+        if post_github_comment(report, current, baseline):
+            click.echo(click.style("✓ Posted PR comment", fg="green"))
+        else:
+            click.echo(click.style("⚠ Failed to post PR comment", fg="yellow"))
+
+    # Update commit status
+    if update_status:
+        click.echo("Updating commit status...")
+        if update_pr_status(report):
+            click.echo(click.style("✓ Updated commit status", fg="green"))
+        else:
+            click.echo(click.style("⚠ Failed to update commit status", fg="yellow"))
+
+    # Exit with status code
+    if report.passed:
+        click.echo(click.style("\n✅ All checks passed!", fg="green"))
+    else:
+        click.echo(click.style("\n❌ Regression detected!", fg="red"))
+        for check in report.failed_checks:
+            click.echo(f"  - {check.name}: {check.message}")
+        sys.exit(1)
 
 
 @main.command("init-config")
