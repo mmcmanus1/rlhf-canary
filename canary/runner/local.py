@@ -85,8 +85,8 @@ class LocalRunner(BaseRunner):
         import torch
         from datasets import load_dataset
         from peft import LoraConfig
-        from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
-        from trl import DPOTrainer
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from trl import DPOConfig, DPOTrainer
 
         logger.info("Loading tokenizer...")
         tokenizer = AutoTokenizer.from_pretrained(
@@ -149,8 +149,8 @@ class LocalRunner(BaseRunner):
                 task_type="CAUSAL_LM",
             )
 
-        # Training arguments
-        training_args = TrainingArguments(
+        # Training arguments (DPOConfig extends TrainingArguments with DPO-specific params)
+        training_args = DPOConfig(
             output_dir=str(output_dir / "checkpoints"),
             per_device_train_batch_size=self.config.batch_size,
             gradient_accumulation_steps=self.config.gradient_accumulation_steps,
@@ -164,6 +164,10 @@ class LocalRunner(BaseRunner):
             seed=self.config.seed,
             learning_rate=self.config.learning_rate,
             warmup_steps=self.config.warmup_steps,
+            # DPO-specific parameters (moved from DPOTrainer constructor in TRL 0.12+)
+            beta=self.config.beta,
+            max_prompt_length=self.config.max_prompt_length,
+            max_length=self.config.max_length,
         )
 
         # Create callback
@@ -182,9 +186,6 @@ class LocalRunner(BaseRunner):
             train_dataset=dataset,
             processing_class=tokenizer,
             peft_config=peft_config,
-            beta=self.config.beta,
-            max_prompt_length=self.config.max_prompt_length,
-            max_length=self.config.max_length,
             callbacks=[canary_callback],
         )
 
