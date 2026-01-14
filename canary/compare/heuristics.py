@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from canary.collect.metrics import CanaryMetrics
-from canary.compare.stats import CheckStatus, ComparisonReport
+from canary.compare.stats import ComparisonReport
 
 
 class RegressionCategory(str, Enum):

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
 
 import click
 
@@ -195,8 +193,6 @@ def report(
 
     COMPARISON_PATH: Path to comparison report JSON
     """
-    from canary.compare.stats import ComparisonReport, load_metrics
-    from canary.report.github import post_github_comment
 
     click.echo(f"Loading comparison report: {comparison_path}")
 

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -15,7 +13,6 @@ from canary.compare.thresholds import (
     SMOKE_THRESHOLDS,
     Thresholds,
 )
-from canary.runner.base import CanaryConfig
 
 
 class TestTier(str, Enum):
