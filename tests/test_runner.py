@@ -94,6 +94,37 @@ class TestRunnerValidation:
         assert is_valid is True
         assert len(errors) == 0
 
+    def test_valid_ppo_config(self):
+        """Test validation of valid PPO config."""
+        from canary.runner.local import LocalRunner
+
+        config = CanaryConfig(
+            name="valid_ppo",
+            training_type="ppo",
+            max_steps=50,
+            batch_size=2,
+            ppo_epochs=4,
+            init_kl_coef=0.2,
+        )
+
+        runner = LocalRunner(config)
+        is_valid, errors = runner.validate_config()
+
+        assert is_valid is True
+        assert len(errors) == 0
+
+    def test_ppo_config_defaults(self):
+        """Test PPO-specific config defaults."""
+        config = CanaryConfig(name="ppo_test", training_type="ppo")
+
+        assert config.ppo_epochs == 4
+        assert config.init_kl_coef == 0.2
+        assert config.target_kl == 6.0
+        assert config.cliprange == 0.2
+        assert config.vf_coef == 0.1
+        assert config.use_synthetic_reward is True
+        assert config.max_new_tokens == 64
+
     def test_invalid_training_type(self):
         """Test validation rejects invalid training type."""
         from canary.runner.local import LocalRunner

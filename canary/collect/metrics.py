@@ -24,6 +24,13 @@ STABILITY_KEYS = {
     "rewards/chosen",
     "rewards/rejected",
     "kl",
+    # PPO-specific metrics
+    "objective/kl",
+    "objective/entropy",
+    "ppo/policy_loss",
+    "ppo/value_loss",
+    "ppo/clipfrac",
+    "ppo/mean_non_score_reward",
 }
 
 
@@ -384,9 +391,13 @@ class CanaryCallback(TrainerCallback):
         if len(self.loss_values) > 20:
             early_avg = statistics.mean(self.loss_values[:10])
             late_avg = statistics.mean(self.loss_values[-10:])
-            # Consider diverged if loss increased by more than 50%
-            if late_avg > early_avg * 1.5:
-                loss_diverged = True
+            # Handle negative losses: check if loss magnitude increased significantly
+            if early_avg >= 0:
+                # Positive losses: late > early * 1.5 means divergence
+                loss_diverged = late_avg > early_avg * 1.5
+            else:
+                # Negative losses: more negative (larger magnitude) means divergence
+                loss_diverged = late_avg < early_avg * 1.5
 
         return StabilityMetrics(
             nan_steps=self.nan_steps,

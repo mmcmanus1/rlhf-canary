@@ -54,12 +54,28 @@ DEFAULT_TEST_MATRIX: list[TestDefinition] = [
         timeout_minutes=15,
     ),
     TestDefinition(
+        name="ppo_smoke",
+        description="PPO smoke test for PR gating (with synthetic reward)",
+        tier=TestTier.SMOKE,
+        config_path="configs/ppo_smoke.yaml",
+        thresholds=SMOKE_THRESHOLDS,
+        timeout_minutes=20,  # PPO is slower due to generation
+    ),
+    TestDefinition(
         name="dpo_perf",
         description="DPO performance test with profiling",
         tier=TestTier.PERF,
         config_path="configs/dpo_perf.yaml",
         thresholds=PERF_THRESHOLDS,
         timeout_minutes=60,
+    ),
+    TestDefinition(
+        name="ppo_perf",
+        description="PPO performance test (with synthetic reward)",
+        tier=TestTier.PERF,
+        config_path="configs/ppo_perf.yaml",
+        thresholds=PERF_THRESHOLDS,
+        timeout_minutes=90,  # PPO is slower due to generation
     ),
 ]
 
