@@ -9,7 +9,7 @@ from canary.collect.metrics import (
     StabilityMetrics,
     StepTimeStats,
 )
-from canary.compare.stats import CheckStatus, compare_to_baseline
+from canary.compare.stats import CheckStatus, compare_to_baseline, _compute_pct_change
 from canary.compare.thresholds import DEFAULT_THRESHOLDS, Thresholds
 
 
@@ -226,3 +226,58 @@ class TestThresholds:
         assert custom.max_tps_drop_pct == 3.0
         # Default values for unset fields
         assert custom.nan_steps_allowed == 0
+
+
+class TestPhaseAZeroBaselineFix:
+    """Tests for Phase A fix: zero baseline handling in _compute_pct_change.
+
+    Previously, _compute_pct_change returned float('inf') when baseline was 0,
+    which could break downstream comparisons. Now it returns ±1000%.
+    """
+
+    def test_zero_baseline_zero_current(self):
+        """Test that 0 -> 0 returns 0% change."""
+        result = _compute_pct_change(0.0, 0.0)
+        assert result == 0.0
+
+    def test_zero_baseline_positive_current(self):
+        """Test that 0 -> positive returns large positive (not infinity)."""
+        result = _compute_pct_change(0.0, 100.0)
+        assert result == 1000.0
+        assert result != float("inf"), "Should not return infinity"
+
+    def test_zero_baseline_negative_current(self):
+        """Test that 0 -> negative returns large negative (not -infinity)."""
+        result = _compute_pct_change(0.0, -100.0)
+        assert result == -1000.0
+        assert result != float("-inf"), "Should not return negative infinity"
+
+    def test_normal_percentage_change(self):
+        """Test normal percentage change calculation."""
+        # 100 -> 120 = +20%
+        result = _compute_pct_change(100.0, 120.0)
+        assert result == pytest.approx(20.0)
+
+        # 100 -> 80 = -20%
+        result = _compute_pct_change(100.0, 80.0)
+        assert result == pytest.approx(-20.0)
+
+        # 50 -> 75 = +50%
+        result = _compute_pct_change(50.0, 75.0)
+        assert result == pytest.approx(50.0)
+
+    def test_small_baseline(self):
+        """Test with small but non-zero baseline."""
+        # 0.001 -> 0.002 = +100%
+        result = _compute_pct_change(0.001, 0.002)
+        assert result == pytest.approx(100.0)
+
+    def test_result_is_usable_in_comparisons(self):
+        """Test that result can be used in threshold comparisons without error."""
+        result = _compute_pct_change(0.0, 100.0)
+
+        # These should all work without ValueError or other errors
+        assert result > 0
+        assert result < 2000
+        assert result == 1000.0
+        assert abs(result) < float("inf")

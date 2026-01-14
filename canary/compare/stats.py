@@ -56,9 +56,24 @@ class ComparisonReport(BaseModel):
 
 
 def _compute_pct_change(baseline: float, current: float) -> float:
-    """Compute percentage change from baseline to current."""
+    """Compute percentage change from baseline to current.
+
+    Args:
+        baseline: The baseline value to compare against.
+        current: The current value to compare.
+
+    Returns:
+        Percentage change from baseline to current.
+        Returns 0.0 if both values are 0.
+        Returns a large but finite value (1000%) if baseline is 0 but current is not,
+        to avoid infinity which can break downstream comparisons.
+    """
     if baseline == 0:
-        return 0.0 if current == 0 else float("inf")
+        if current == 0:
+            return 0.0
+        # Return a large finite value instead of infinity
+        # This indicates a significant change without breaking downstream math
+        return 1000.0 if current > 0 else -1000.0
     return 100.0 * (current - baseline) / baseline
 
 
