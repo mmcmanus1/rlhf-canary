@@ -165,8 +165,10 @@ class LocalRunner(BaseRunner):
             max_steps=self.config.max_steps,
             logging_steps=10,
             save_strategy="no",  # Don't save checkpoints in canary
-            bf16=use_bf16,
-            fp16=not use_bf16 and torch.cuda.is_available(),
+            # Disable mixed precision - TRL 0.26 has a bug where input_ids get cast
+            # to float tensors during concatenated_forward when bf16/fp16 is enabled
+            bf16=False,
+            fp16=False,
             report_to=[],
             seed=self.config.seed,
             learning_rate=self.config.learning_rate,
