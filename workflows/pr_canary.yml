@@ -1,0 +1,130 @@
+name: RLHF Canary PR Gate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      config:
+        description: 'Config file to use'
+        required: false
+        default: 'configs/dpo_smoke.yaml'
+
+jobs:
+  canary-smoke:
+    name: DPO Smoke Test
+    runs-on: ubuntu-latest
+    # Use GPU runner for real runs - this example uses CPU for demo
+    # runs-on: [self-hosted, gpu]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Show environment
+        run: canary env
+
+      - name: Download baseline (if exists)
+        id: download-baseline
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: pr_canary.yml
+          branch: main
+          name: canary-baseline
+          path: baseline/
+
+      - name: Run canary
+        id: canary
+        run: |
+          CONFIG="${{ github.event.inputs.config || 'configs/dpo_smoke.yaml' }}"
+          echo "Running canary with config: $CONFIG"
+          canary run $CONFIG -o ./canary_output
+
+          # Find the metrics file
+          METRICS=$(find ./canary_output -name "metrics.json" | head -1)
+          echo "metrics_path=$METRICS" >> $GITHUB_OUTPUT
+
+      - name: Compare to baseline
+        id: compare
+        if: steps.download-baseline.outcome == 'success'
+        continue-on-error: true
+        run: |
+          BASELINE=$(find ./baseline -name "metrics.json" | head -1)
+          CURRENT="${{ steps.canary.outputs.metrics_path }}"
+
+          if [ -n "$BASELINE" ] && [ -n "$CURRENT" ]; then
+            echo "Comparing $CURRENT to $BASELINE"
+            canary compare "$CURRENT" "$BASELINE" --threshold-tier smoke -o comparison.md
+            cat comparison.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No baseline found, skipping comparison"
+          fi
+
+      - name: Upload metrics as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-metrics
+          path: ./canary_output/**/metrics.json
+          retention-days: 30
+
+      - name: Update baseline on main
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-baseline
+          path: ./canary_output/**/metrics.json
+          retention-days: 90
+
+      - name: Check comparison result
+        if: steps.compare.outcome == 'failure'
+        run: |
+          echo "::error::Canary regression detected! See comparison report above."
+          exit 1
+
+  canary-perf:
+    name: DPO Performance Test
+    runs-on: ubuntu-latest
+    # Only run on main or manual trigger
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: canary-smoke
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run perf canary
+        run: |
+          echo "Performance test would run here with GPU"
+          echo "Skipping on CPU runner"
+          # canary run configs/dpo_perf.yaml -o ./canary_output
+
+      - name: Post results
+        run: |
+          echo "## Performance Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Skipped - requires GPU runner" >> $GITHUB_STEP_SUMMARY
