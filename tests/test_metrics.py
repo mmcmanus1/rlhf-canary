@@ -168,6 +168,26 @@ class TestCanaryCallback:
         stability = cb.get_stability_metrics()
         assert stability.loss_diverged is True
 
+    def test_loss_divergence_with_negative_losses(self):
+        """Test loss divergence detection with negative losses (e.g., PPO policy loss)."""
+        cb = CanaryCallback()
+        # Negative losses: more negative means divergence (larger magnitude)
+        # early_avg = -0.1, late_avg = -0.5 -> diverged (magnitude increased)
+        cb.loss_values = [-0.1] * 20 + [-0.5] * 20
+
+        stability = cb.get_stability_metrics()
+        assert stability.loss_diverged is True
+
+    def test_loss_convergence_with_negative_losses(self):
+        """Test that improving negative losses are not flagged as divergence."""
+        cb = CanaryCallback()
+        # Negative losses improving: less negative over time (smaller magnitude)
+        # early_avg = -0.5, late_avg = -0.2 -> NOT diverged (magnitude decreased)
+        cb.loss_values = [-0.5] * 20 + [-0.2] * 20
+
+        stability = cb.get_stability_metrics()
+        assert stability.loss_diverged is False
+
     def test_tokens_per_sec_estimation(self):
         """Test tokens per second estimation."""
         cb = CanaryCallback()

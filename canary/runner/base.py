@@ -42,6 +42,15 @@ class CanaryConfig(BaseModel):
     beta: float = 0.1
     max_prompt_length: int = 64
 
+    # PPO-specific
+    ppo_epochs: int = 4
+    init_kl_coef: float = 0.2
+    target_kl: float = 6.0
+    cliprange: float = 0.2
+    vf_coef: float = 0.1
+    use_synthetic_reward: bool = True  # Use synthetic reward for canary testing
+    max_new_tokens: int = 64  # Max tokens to generate per response
+
     # Dataset configuration
     dataset_name: str = "Anthropic/hh-rlhf"
     dataset_split: str = "train"

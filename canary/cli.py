@@ -347,7 +347,7 @@ def gh_report(
 @click.option(
     "--type",
     "training_type",
-    type=click.Choice(["dpo", "sft"]),
+    type=click.Choice(["dpo", "sft", "ppo"]),
     default="dpo",
     help="Training type",
 )
@@ -370,8 +370,11 @@ def init_config(
     """
     import yaml
 
-    # Step counts by tier
-    steps = {"smoke": 100, "perf": 500, "nightly": 2000}
+    # Step counts by tier (PPO is slower due to generation, so use smaller counts)
+    if training_type == "ppo":
+        steps = {"smoke": 50, "perf": 200, "nightly": 500}
+    else:
+        steps = {"smoke": 100, "perf": 500, "nightly": 2000}
 
     config = {
         "name": f"{training_type}_{tier}",
@@ -398,6 +401,15 @@ def init_config(
     if training_type == "dpo":
         config["beta"] = 0.1
         config["max_prompt_length"] = 64
+    elif training_type == "ppo":
+        config["ppo_epochs"] = 4
+        config["init_kl_coef"] = 0.2
+        config["target_kl"] = 6.0
+        config["cliprange"] = 0.2
+        config["vf_coef"] = 0.1
+        config["max_prompt_length"] = 64
+        config["max_new_tokens"] = 64
+        config["use_synthetic_reward"] = True
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,48 @@
+# PPO Smoke Test Configuration
+# Quick canary run for PR gating (~10-15 min)
+# PPO is slower than SFT/DPO due to generation step
+
+name: ppo_smoke
+description: PPO smoke test - quick validation for PR gating
+
+# Model configuration
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Training configuration
+training_type: ppo
+max_steps: 50
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 1.0e-5
+max_length: 256
+warmup_steps: 5
+
+# PPO-specific
+ppo_epochs: 4
+init_kl_coef: 0.2
+target_kl: 6.0
+cliprange: 0.2
+vf_coef: 0.1
+max_prompt_length: 64
+max_new_tokens: 64
+use_synthetic_reward: true
+
+# Dataset configuration
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 256
+seed: 42
+
+# Output configuration
+output_dir: ./canary_output
+
+# Metrics configuration
+metrics_warmup_steps: 5
+
+# Profiler (disabled for smoke)
+profiler:
+  enabled: false
