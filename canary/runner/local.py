@@ -194,7 +194,7 @@ class LocalRunner(BaseRunner):
             ref_model=None,  # DPOTrainer creates ref model internally
             args=training_args,
             train_dataset=dataset,
-            processing_class=tokenizer,
+            tokenizer=tokenizer,
             peft_config=peft_config,
             callbacks=[canary_callback],
         )
@@ -341,7 +341,7 @@ class LocalRunner(BaseRunner):
             model=model,
             args=training_args,
             train_dataset=dataset,
-            processing_class=tokenizer,
+            tokenizer=tokenizer,
             peft_config=peft_config,
             max_seq_length=self.config.max_length,
             callbacks=[canary_callback],

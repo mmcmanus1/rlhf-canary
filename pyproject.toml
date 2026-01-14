@@ -26,14 +26,16 @@ classifiers = [
 keywords = ["rlhf", "machine-learning", "training", "regression-testing", "canary"]
 
 dependencies = [
-    "transformers>=4.35.0",
+    "transformers==4.44.2",
     "datasets>=2.14.0",
-    "trl==0.12.2",  # Strictly pin to 0.12.2 to fix embedding dtype crash    "peft>=0.6.0",
+    "trl==0.11.4",        # STRICT PIN: Do not change to >=0.12.0
+    "peft==0.12.0",
+    "accelerate==0.34.2",
+    "tokenizers==0.19.1",
     "torch>=2.0.0",
     "pydantic>=2.0.0",
     "click>=8.0.0",
     "PyYAML>=6.0",
-    "accelerate>=0.24.0",
 ]
 
 [project.optional-dependencies]
