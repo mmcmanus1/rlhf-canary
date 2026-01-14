@@ -97,14 +97,21 @@ class LocalRunner(BaseRunner):
             tokenizer.pad_token = tokenizer.eos_token
 
         logger.info("Loading model...")
-        model_kwargs: dict[str, Any] = {"device_map": "auto"}
+        # Determine compute dtype for consistent usage across model and training
+        use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+
+        model_kwargs: dict[str, Any] = {
+            "device_map": "auto",
+            "torch_dtype": compute_dtype,
+        }
 
         if self.config.load_in_4bit:
             from transformers import BitsAndBytesConfig
 
             model_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=compute_dtype,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
             )
@@ -158,8 +165,8 @@ class LocalRunner(BaseRunner):
             max_steps=self.config.max_steps,
             logging_steps=10,
             save_strategy="no",  # Don't save checkpoints in canary
-            bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
-            fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
+            bf16=use_bf16,
+            fp16=not use_bf16 and torch.cuda.is_available(),
             report_to=[],
             seed=self.config.seed,
             learning_rate=self.config.learning_rate,
@@ -168,6 +175,7 @@ class LocalRunner(BaseRunner):
             beta=self.config.beta,
             max_prompt_length=self.config.max_prompt_length,
             max_length=self.config.max_length,
+            precompute_ref_log_probs=False,  # Explicitly disable to avoid dtype issues
         )
 
         # Create callback
@@ -249,14 +257,21 @@ class LocalRunner(BaseRunner):
             tokenizer.pad_token = tokenizer.eos_token
 
         logger.info("Loading model...")
-        model_kwargs: dict[str, Any] = {"device_map": "auto"}
+        # Determine compute dtype for consistent usage across model and training
+        use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+
+        model_kwargs: dict[str, Any] = {
+            "device_map": "auto",
+            "torch_dtype": compute_dtype,
+        }
 
         if self.config.load_in_4bit:
             from transformers import BitsAndBytesConfig
 
             model_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=compute_dtype,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
             )
@@ -304,8 +319,8 @@ class LocalRunner(BaseRunner):
             max_steps=self.config.max_steps,
             logging_steps=10,
             save_strategy="no",  # Don't save checkpoints in canary
-            bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
-            fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
+            bf16=use_bf16,
+            fp16=not use_bf16 and torch.cuda.is_available(),
             report_to=[],
             seed=self.config.seed,
             learning_rate=self.config.learning_rate,
