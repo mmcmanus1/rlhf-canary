@@ -1,0 +1,27 @@
+name: sft_unstable
+description: Intentionally unstable SFT - high learning rate
+
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+training_type: sft
+max_steps: 50
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 1.0e-2   # 200x higher than normal!
+max_length: 256
+warmup_steps: 2
+
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 256
+seed: 42
+
+output_dir: ./sft_output
+metrics_warmup_steps: 2
+
+profiler:
+  enabled: false

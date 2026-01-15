@@ -1,0 +1,34 @@
+name: dpo_memory_regression
+description: Simulates memory regression via longer sequences
+
+# Model configuration
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Training configuration - LONGER SEQUENCES = MORE MEMORY
+training_type: dpo
+max_steps: 60
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+max_length: 512            # 2x longer sequences!
+warmup_steps: 5
+
+# DPO-specific
+beta: 0.1
+max_prompt_length: 128     # Also longer prompts
+
+# Dataset configuration
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 256
+seed: 42
+
+output_dir: ./rca_output
+metrics_warmup_steps: 5
+
+profiler:
+  enabled: false

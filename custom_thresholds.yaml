@@ -1,0 +1,7 @@
+# Custom thresholds - start from smoke tier but customize
+base_tier: smoke
+
+# Override specific thresholds
+max_step_time_increase_pct: 20.0  # Allow 20% step time increase
+max_tps_drop_pct: 15.0            # Allow 15% throughput drop
+max_mem_increase_mb: 750.0        # Allow 750MB memory increase

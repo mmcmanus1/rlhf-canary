@@ -1,0 +1,27 @@
+name: sft_run2
+description: Second SFT run for comparison
+
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+training_type: sft
+max_steps: 100
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+max_length: 256
+warmup_steps: 10
+
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 512
+seed: 123  # Different seed
+
+output_dir: ./sft_output
+metrics_warmup_steps: 10
+
+profiler:
+  enabled: false
