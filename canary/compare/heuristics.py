@@ -77,7 +77,7 @@ def analyze_regression(
     elif len(suspects) == 1:
         summary = f"Most likely cause: {suspects[0].category.value} ({suspects[0].description})"
     else:
-        top_categories = [s.category.value for s in suspects[:3]]
+        top_categories = list(dict.fromkeys(s.category.value for s in suspects[:3]))
         summary = f"Potential causes: {', '.join(top_categories)}"
 
     return HeuristicAnalysis(
