@@ -1,0 +1,34 @@
+name: sft_profiled
+description: SFT with profiler enabled
+
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+training_type: sft
+max_steps: 80
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+max_length: 256
+warmup_steps: 10
+
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 512
+seed: 42
+
+output_dir: ./sft_output
+metrics_warmup_steps: 10
+
+# Enable profiler
+profiler:
+  enabled: true
+  start_step: 50
+  num_steps: 20
+  output_dir: ./sft_profiler_traces
+  record_shapes: true
+  profile_memory: true
+  with_stack: false

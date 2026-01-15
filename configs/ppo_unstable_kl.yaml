@@ -1,0 +1,41 @@
+name: ppo_unstable_kl
+description: Intentionally unstable PPO - extreme init_kl_coef
+
+# Model configuration
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Training configuration
+training_type: ppo
+max_steps: 30
+batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 1.0e-4   # Higher LR
+max_length: 256
+warmup_steps: 2
+
+# PPO-specific - UNSTABLE SETTINGS
+ppo_epochs: 8         # More epochs per step
+init_kl_coef: 0.01    # Very low KL penalty - allows policy to drift
+target_kl: 100.0      # Very high target - won't adapt
+cliprange: 0.4        # Wider clipping - less stable
+vf_coef: 0.1
+max_prompt_length: 64
+max_new_tokens: 64
+use_synthetic_reward: true
+
+# Dataset configuration
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 128
+seed: 42
+
+# Output configuration
+output_dir: ./stability_output
+metrics_warmup_steps: 2
+
+profiler:
+  enabled: false

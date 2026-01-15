@@ -1,0 +1,27 @@
+name: dpo_slow
+description: Intentionally slow config for regression demo
+
+model_name: EleutherAI/pythia-70m
+use_peft: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+training_type: dpo
+max_steps: 100
+batch_size: 1  # Smaller batch = slower!
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-5
+max_length: 256
+warmup_steps: 10
+
+beta: 0.1
+max_prompt_length: 64
+
+dataset_name: Anthropic/hh-rlhf
+dataset_split: train
+dataset_size: 512
+seed: 42
+
+output_dir: ./canary_output
+metrics_warmup_steps: 10
