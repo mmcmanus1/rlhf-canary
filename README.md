@@ -2,12 +2,24 @@
 
 Regression detection for RLHF/finetuning pipelines. Automatically catch performance, stability, and correctness regressions before they waste researcher time.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/quickstart.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/01_quickstart.ipynb)
 
 **No local GPU? No problem.** Try RLHF Canary with a free T4 GPU in Google Colab (~15 min):
 - Run a DPO canary training job
 - Save metrics as a baseline
 - Compare runs and detect regressions
+
+### Tutorials
+
+| Notebook | Description | |
+|----------|-------------|---|
+| [01_quickstart](notebooks/01_quickstart.ipynb) | Core workflow for detecting regressions | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/01_quickstart.ipynb) |
+| [02_profiler_deep_dive](notebooks/02_profiler_deep_dive.ipynb) | PyTorch profiler for GPU bottlenecks | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/02_profiler_deep_dive.ipynb) |
+| [03_stability_monitoring](notebooks/03_stability_monitoring.ipynb) | NaN/loss divergence detection | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/03_stability_monitoring.ipynb) |
+| [04_root_cause_analysis](notebooks/04_root_cause_analysis.ipynb) | Heuristics for debugging failures | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/04_root_cause_analysis.ipynb) |
+| [05_ppo_canary](notebooks/05_ppo_canary.ipynb) | PPO-specific training validation | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/05_ppo_canary.ipynb) |
+| [06_sft_canary](notebooks/06_sft_canary.ipynb) | SFT training validation | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/06_sft_canary.ipynb) |
+| [vscode_dev](notebooks/vscode_dev.ipynb) | Local VS Code + Colab development | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mmcmanus1/rlhf-canary/blob/main/notebooks/vscode_dev.ipynb) |
 
 ## Features
 
