@@ -154,13 +154,14 @@ class ProfilerCallback:
         if self._profiler is None:
             return ProfilerSummary()
 
-        # Generate summary before closing (profiler data needed)
-        summary = self._generate_summary()
-
-        # Properly close the profiler context via ExitStack
+        # Close the profiler context FIRST - key_averages() is only populated
+        # after __exit__() is called on the profiler context
         if self._exit_stack is not None:
             self._exit_stack.close()
             self._exit_stack = None
+
+        # Generate summary AFTER closing (profiler data only available after exit)
+        summary = self._generate_summary()
 
         self._profiler = None
         return summary
@@ -179,27 +180,27 @@ class ProfilerCallback:
             trace_path = output_dir / "trace.json"
             self._profiler.export_chrome_trace(str(trace_path))
 
-            # Compute totals
+            # Compute totals - use getattr to handle missing CUDA attributes gracefully
             cuda_time_total = sum(
-                item.cuda_time_total for item in key_averages if item.cuda_time_total
+                getattr(item, "cuda_time_total", 0) or 0 for item in key_averages
             )
             cpu_time_total = sum(
-                item.cpu_time_total for item in key_averages if item.cpu_time_total
+                getattr(item, "cpu_time_total", 0) or 0 for item in key_averages
             )
             self_cuda_time_total = sum(
-                item.self_cuda_time_total for item in key_averages if item.self_cuda_time_total
+                getattr(item, "self_cuda_time_total", 0) or 0 for item in key_averages
             )
 
             # Get top ops by CUDA time
             cuda_sorted = sorted(
                 key_averages,
-                key=lambda x: x.self_cuda_time_total or 0,
+                key=lambda x: getattr(x, "self_cuda_time_total", 0) or 0,
                 reverse=True,
             )
             top_cuda_ops = [
                 {
                     "name": item.key,
-                    "self_cuda_time_ms": (item.self_cuda_time_total or 0) / 1000,
+                    "self_cuda_time_ms": (getattr(item, "self_cuda_time_total", 0) or 0) / 1000,
                     "count": item.count,
                 }
                 for item in cuda_sorted[:10]
@@ -208,13 +209,13 @@ class ProfilerCallback:
             # Get top ops by CPU time
             cpu_sorted = sorted(
                 key_averages,
-                key=lambda x: x.self_cpu_time_total or 0,
+                key=lambda x: getattr(x, "self_cpu_time_total", 0) or 0,
                 reverse=True,
             )
             top_cpu_ops = [
                 {
                     "name": item.key,
-                    "self_cpu_time_ms": (item.self_cpu_time_total or 0) / 1000,
+                    "self_cpu_time_ms": (getattr(item, "self_cpu_time_total", 0) or 0) / 1000,
                     "count": item.count,
                 }
                 for item in cpu_sorted[:10]
@@ -229,7 +230,8 @@ class ProfilerCallback:
                 top_cpu_ops=top_cpu_ops,
             )
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to generate profiler summary: {e}", exc_info=True)
             return ProfilerSummary()
 
 
