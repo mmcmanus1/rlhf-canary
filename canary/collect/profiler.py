@@ -191,9 +191,15 @@ class ProfilerCallback:
                 getattr(item, "self_cuda_time_total", 0) or 0 for item in key_averages
             )
 
-            # Get top ops by CUDA time
+            # Get top ops by CUDA time - filter out zero-time ops to avoid showing
+            # misleading "top CUDA operations" that aren't actual GPU kernels
+            # (common when CUPTI profiling is unavailable on some cloud GPUs)
+            cuda_ops_with_time = [
+                item for item in key_averages
+                if (getattr(item, "self_cuda_time_total", 0) or 0) > 0
+            ]
             cuda_sorted = sorted(
-                key_averages,
+                cuda_ops_with_time,
                 key=lambda x: getattr(x, "self_cuda_time_total", 0) or 0,
                 reverse=True,
             )
